@@ -10,6 +10,7 @@ using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Exception = Autodesk.AutoCAD.Runtime.Exception;
+using System.Data.Common;
 
 
 //[assembly: CommandClass(TypeOfCoordinates(IncrementationProgram.IncrementClass))]
@@ -25,8 +26,6 @@ namespace IncrementationProgram
         public void IncrementUp()
         {
 
-            //Next Step is to actually turn this into 6 commands and remove the form for now. When all 6 commands work, we can put it all together in 
-            //one larger program. 
 
 
             //Get the Current Document and database, and start a transaction
@@ -676,6 +675,271 @@ namespace IncrementationProgram
                 Application.ShowAlertDialog(ex.Message);
             }
             //foreach(Text)
+
+        }
+
+        //A program to increment handholes (blocks) using the attribute "STRUCTURENAME"
+        [CommandMethod("IncrementHHStructureUp", CommandFlags.UsePickSet)]
+        public void IncrementHHStructureUp()
+        {
+
+            //The standard starting stuff
+            //Get the Current Document and database, and start a transaction
+            Document acDoc = Application.DocumentManager.MdiActiveDocument;
+            Database acDb = acDoc.Database;
+            Editor docEd = acDoc.Editor;
+            SelectionSet acSSet;
+
+            //THIS PORTTION OF THE CODE COLLECTS OUR BLOCKS AND FILTERS THE SELECTION FOR ONLY BLOCKS
+            //Create a selection filter for blocks only
+            TypedValue[] acTypeValue = new TypedValue[1];
+            acTypeValue.SetValue(new TypedValue((int)DxfCode.Start, "INSERT"), 0);
+            SelectionFilter sFilter = new SelectionFilter(acTypeValue);
+
+            //Get the active selection set/check if there is anything in the selection set already
+            PromptSelectionResult acSSPrompt = docEd.SelectImplied();
+            ObjectId[] selectionFinal = null;
+
+            //Process all objects to ensure we only have blocks
+            List<BlockReference> BlockArray = new List<BlockReference> { };
+
+            if (acSSPrompt.Status == PromptStatus.OK)
+            {
+                acSSet = acSSPrompt.Value;
+
+
+
+            }
+            else
+            {
+
+                acSSet = docEd.GetSelection(sFilter).Value;
+            }
+
+            //Put all the selected objects into a final list
+            selectionFinal = acSSet.GetObjectIds();
+            //Process the list to ensure that only blocks are selected
+            try
+            {
+                using (Transaction acTrans = acDb.TransactionManager.StartTransaction())
+                {
+                    //Ensure All items are blocks and place them into Block List
+                    foreach (ObjectId blockIDs in selectionFinal)
+                    {
+                        var currentObject = acTrans.GetObject(blockIDs, OpenMode.ForRead);
+                        if (currentObject is BlockReference)
+                        {
+                            BlockReference blockJawns = acTrans.GetObject(blockIDs, OpenMode.ForWrite) as BlockReference;
+                            BlockArray.Add(blockJawns);
+                        }
+                    }
+                    acTrans.Commit();
+                }
+
+            }
+            catch (System.Exception x)
+            {
+                System.Windows.Forms.MessageBox.Show(x.Message);
+            }
+
+            //ASK USER TO INPUT SOMETHING TO INCREMENT BY
+            PromptIntegerOptions prIntOps = new PromptIntegerOptions("Please enter an integer to add to the existing number: ");
+            prIntOps.AllowZero = true;
+            prIntOps.AllowNegative = false;
+            prIntOps.AllowNone = true;
+            prIntOps.DefaultValue = 1;
+            PromptIntegerResult pResult = docEd.GetInteger(prIntOps);
+
+            if (pResult.Status == PromptStatus.OK)
+            {
+                amountToIncrement = pResult.Value;
+            }
+
+
+            try
+            {
+                //THIS PORTION OF THE CODE WILL ACCESS THE STRUCTURENAME ATTRIBUTE AND ADD OUR NUMBER
+                using (Transaction acTrans = acDb.TransactionManager.StartTransaction())
+                {
+                    foreach (BlockReference block in BlockArray)
+                    {
+                        AttributeCollection acColl = block.AttributeCollection;
+                        foreach (ObjectId attribute in acColl)
+                        {
+                            var attRef = (AttributeReference)acTrans.GetObject(attribute, OpenMode.ForWrite);
+                            if (attRef.Tag.Equals("STRUCTURENAME", StringComparison.CurrentCultureIgnoreCase))
+                            {
+                                string currentMtextTag = attRef.TextString;
+                                var numberToChange = Regex.Match(attRef.TextString, @"\d+$").Value;
+
+                                if (currentMtextTag.Length > numberToChange.Length)
+                                {
+                                    string stringToKeep = currentMtextTag.Remove(currentMtextTag.Length - numberToChange.Length);
+
+                                    int newNumber = Int16.Parse(numberToChange) + amountToIncrement;
+                                    attRef.TextString = stringToKeep + newNumber.ToString();
+
+                                }
+                                else
+                                {
+                                    int newNumber = Int16.Parse(numberToChange) + amountToIncrement;
+
+                                    //Set the current Mtext Object to reflect the new number
+                                    attRef.TextString = newNumber.ToString();
+                                }
+
+                            }
+                        }
+                    }
+
+                    acTrans.Commit();
+                }
+            }
+            catch(Exception e )
+            {
+                System.Windows.Forms.MessageBox.Show(e.Message);
+            }
+
+
+        }
+
+        //A program to increment handholes (blocks) using the attribute "STRUCTURENAME"
+        [CommandMethod("IncrementHHStructureDown", CommandFlags.UsePickSet)]
+        public void IncrementHHStructureDown()
+        {
+
+            //The standard starting stuff
+            //Get the Current Document and database, and start a transaction
+            Document acDoc = Application.DocumentManager.MdiActiveDocument;
+            Database acDb = acDoc.Database;
+            Editor docEd = acDoc.Editor;
+            SelectionSet acSSet;
+
+            //THIS PORTTION OF THE CODE COLLECTS OUR BLOCKS AND FILTERS THE SELECTION FOR ONLY BLOCKS
+            //Create a selection filter for blocks only
+            TypedValue[] acTypeValue = new TypedValue[1];
+            acTypeValue.SetValue(new TypedValue((int)DxfCode.Start, "INSERT"), 0);
+            SelectionFilter sFilter = new SelectionFilter(acTypeValue);
+
+            //Get the active selection set/check if there is anything in the selection set already
+            PromptSelectionResult acSSPrompt = docEd.SelectImplied();
+            ObjectId[] selectionFinal = null;
+
+            //Process all objects to ensure we only have blocks
+            List<BlockReference> BlockArray = new List<BlockReference> { };
+
+            if (acSSPrompt.Status == PromptStatus.OK)
+            {
+                acSSet = acSSPrompt.Value;
+
+
+
+            }
+            else
+            {
+
+                acSSet = docEd.GetSelection(sFilter).Value;
+            }
+
+            //Put all the selected objects into a final list
+            selectionFinal = acSSet.GetObjectIds();
+            //Process the list to ensure that only blocks are selected
+            try
+            {
+                using (Transaction acTrans = acDb.TransactionManager.StartTransaction())
+                {
+                    //Ensure All items are blocks and place them into Block List
+                    foreach (ObjectId blockIDs in selectionFinal)
+                    {
+                        var currentObject = acTrans.GetObject(blockIDs, OpenMode.ForRead);
+                        if (currentObject is BlockReference)
+                        {
+                            BlockReference blockJawns = acTrans.GetObject(blockIDs, OpenMode.ForWrite) as BlockReference;
+                            BlockArray.Add(blockJawns);
+                        }
+                    }
+                    acTrans.Commit();
+                }
+
+            }
+            catch (System.Exception x)
+            {
+                System.Windows.Forms.MessageBox.Show(x.Message);
+            }
+
+            //ASK USER TO INPUT SOMETHING TO INCREMENT BY
+            PromptIntegerOptions prIntOps = new PromptIntegerOptions("Please enter an integer to subtract from the existing number: ");
+            prIntOps.AllowZero = true;
+            prIntOps.AllowNegative = false;
+            prIntOps.AllowNone = true;
+            prIntOps.DefaultValue = 1;
+            PromptIntegerResult pResult = docEd.GetInteger(prIntOps);
+
+            if (pResult.Status == PromptStatus.OK)
+            {
+                amountToIncrement = pResult.Value;
+            }
+
+
+            try
+            {
+                //THIS PORTION OF THE CODE WILL ACCESS THE STRUCTURENAME ATTRIBUTE AND ADD OUR NUMBER
+                using (Transaction acTrans = acDb.TransactionManager.StartTransaction())
+                {
+                    foreach (BlockReference block in BlockArray)
+                    {
+                        AttributeCollection acColl = block.AttributeCollection;
+                        foreach (ObjectId attribute in acColl)
+                        {
+                            var attRef = (AttributeReference)acTrans.GetObject(attribute, OpenMode.ForWrite);
+                            if (attRef.Tag.Equals("STRUCTURENAME", StringComparison.CurrentCultureIgnoreCase))
+                            {
+                                string currentMtextTag = attRef.TextString;
+                                var numberToChange = Regex.Match(attRef.TextString, @"\d+$").Value;
+
+                                if (currentMtextTag.Length > numberToChange.Length)
+                                {
+                                    string stringToKeep = currentMtextTag.Remove(currentMtextTag.Length - numberToChange.Length);
+                                    int newNumber;
+                                    if (Int16.Parse(numberToChange) - amountToIncrement < 0)
+                                    {
+                                        newNumber = 0; ;
+                                    }
+                                    else
+                                    {
+                                        newNumber = Int16.Parse(numberToChange) - amountToIncrement;
+                                    }
+                                    attRef.TextString = stringToKeep + newNumber.ToString();
+
+                                }
+                                else
+                                {
+                                    int newNumber;
+
+                                    if(Int16.Parse(numberToChange) - amountToIncrement < 0)
+                                    {
+                                        newNumber = 0;
+                                    }
+                                    else
+                                    {
+                                        newNumber = Int16.Parse(numberToChange) - amountToIncrement;
+                                    }
+                                    //Set the current Mtext Object to reflect the new number
+                                    attRef.TextString = newNumber.ToString();
+                                }
+
+                            }
+                        }
+                    }
+
+                    acTrans.Commit();
+                }
+            }
+            catch (Exception e)
+            {
+                System.Windows.Forms.MessageBox.Show(e.Message);
+            }
+
 
         }
     }
